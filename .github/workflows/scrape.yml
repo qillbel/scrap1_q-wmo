@@ -2,7 +2,7 @@ name: scrap3
 
 on:
   schedule:
-    - cron: '0 0 12 ? * SUN,SAT' #the schedule, in this case every Mon,Wed,Fri at 22:00, in cron time (https://www.freeformatter.com/cron-expression-generator-quartz.html)
+    - cron: '0 0 12 ? * SUN' #the schedule, in this case every Mon,Wed,Fri at 22:00, in cron time (https://www.freeformatter.com/cron-expression-generator-quartz.html)
 
 jobs:
   build:
