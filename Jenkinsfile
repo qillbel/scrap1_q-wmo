@@ -1,26 +1,54 @@
 pipeline {
     agent any
 
+    environment {
+        BRANCH_NAME = "${env.BRANCH_NAME}"
+    }
+
     stages {
-        stage('Build') {
+        stage('Checkout') {
             steps {
-                echo "Building branch: ${env.BRANCH_NAME}"
+                checkout scm
+                echo "Checked out branch: ${env.BRANCH_NAME}"
             }
         }
 
-        stage('Test') {
+        stage('Build') {
             steps {
-                echo "Running tests on branch: ${env.BRANCH_NAME}"
+                echo "Running build on branch: ${env.BRANCH_NAME}"
+                // Example: Install dependencies
+                sh 'npm install'
+            }
+        }
+
+        stage('Lint') {
+            steps {
+                echo 'Running linter...'
+                sh 'npm run lint || true' // Don’t fail build on lint
+            }
+        }
+
+        stage('Unit Tests') {
+            steps {
+                echo 'Running unit tests...'
+                sh 'npm run test:unit'
+            }
+        }
+
+        stage('Integration Tests') {
+            steps {
+                echo 'Running integration tests...'
+                sh 'npm run test:integration'
             }
         }
     }
 
     post {
         success {
-            echo "Build succeeded"
+            echo "✅ CI Pipeline passed"
         }
         failure {
-            echo "Build failed"
+            echo "❌ CI Pipeline failed"
         }
     }
 }
