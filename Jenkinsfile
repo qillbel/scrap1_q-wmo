@@ -2,9 +2,9 @@ pipeline {
     agent any
 
     environment {
-        GITHUB_TOKEN = credentials('github-token')
+        GITHUB_TOKEN = credentials('github-token') // Ensure this exists in Jenkins Credentials
         GITHUB_REPO = 'qillbel/scrap1_q-wmo'
-        PR_ID = '11' // <-- set this dynamically or manually for now
+        PR_ID = '11' // Replace or dynamically assign if needed
         BASE_BRANCH = 'main'
     }
 
@@ -16,55 +16,30 @@ pipeline {
                     git config --global user.name "jenkins bot"
                     git remote set-url origin https://github.com/${GITHUB_REPO}.git
 
-                    # Fetch base branch
                     git fetch origin ${BASE_BRANCH}
-
-                    # Fetch merged PR commit from GitHub's special ref
                     git fetch origin pull/${PR_ID}/merge:pr-${PR_ID}-merge
-
-                    # Checkout the merged commit
                     git checkout pr-${PR_ID}-merge
 
-                    # Save commit SHA for GitHub status API
                     COMMIT_SHA=$(git rev-parse HEAD)
                     echo "COMMIT_SHA=${COMMIT_SHA}" > env.properties
                 '''
             }
         }
 
-        stage('Load Commit SHA') {
+        stage('Load SHA') {
             steps {
                 script {
                     def props = readProperties file: 'env.properties'
-                    env.COMMIT_SHA = props['COMMIT_SHA']
+                    env.COMMIT_SHA = props.COMMIT_SHA
                 }
             }
         }
 
-        stage('Build') {
+        stage('Build & Test') {
             steps {
-                echo "Running build on merged commit: ${env.COMMIT_SHA}"
                 sh 'npm install'
-            }
-        }
-
-        stage('Lint') {
-            steps {
-                echo 'Running linter...'
                 sh 'npm run lint || true'
-            }
-        }
-
-        stage('Unit Tests') {
-            steps {
-                echo 'Running unit tests...'
                 sh 'npm run test:unit'
-            }
-        }
-
-        stage('Integration Tests') {
-            steps {
-                echo 'Running integration tests...'
                 sh 'npm run test:integration'
             }
         }
@@ -72,21 +47,45 @@ pipeline {
 
     post {
         success {
-            echo "✅ CI Pipeline passed"
-            sh '''
-                curl -s -X POST -H "Authorization: token ${GITHUB_TOKEN}" \
-                -d '{"state": "success", "context": "continuous-integration/jenkins/pr-merge", "description": "Merged build passed", "target_url": "'"${BUILD_URL}"'"}' \
-                https://api.github.com/repos/${GITHUB_REPO}/statuses/${COMMIT_SHA}
-            '''
+            script {
+                def statusPayload = """
+                {
+                  "state": "success",
+                  "context": "continuous-integration/jenkins/pr-merge",
+                  "description": "Merged build passed",
+                  "target_url": "${env.BUILD_URL}"
+                }
+                """
+
+                sh """#!/bin/bash
+                curl -s -X POST \
+                  -H "Authorization: token ${GITHUB_TOKEN}" \
+                  -H "Content-Type: application/json" \
+                  -d '${statusPayload}' \
+                  https://api.github.com/repos/${GITHUB_REPO}/statuses/${COMMIT_SHA}
+                """
+            }
         }
 
         failure {
-            echo "❌ CI Pipeline failed"
-            sh '''
-                curl -s -X POST -H "Authorization: token ${GITHUB_TOKEN}" \
-                -d '{"state": "failure", "context": "continuous-integration/jenkins/pr-merge", "description": "Merged build failed", "target_url": "'"${BUILD_URL}"'"}' \
-                https://api.github.com/repos/${GITHUB_REPO}/statuses/${COMMIT_SHA}
-            '''
+            script {
+                def statusPayload = """
+                {
+                  "state": "failure",
+                  "context": "continuous-integration/jenkins/pr-merge",
+                  "description": "Merged build failed",
+                  "target_url": "${env.BUILD_URL}"
+                }
+                """
+
+                sh """#!/bin/bash
+                curl -s -X POST \
+                  -H "Authorization: token ${GITHUB_TOKEN}" \
+                  -H "Content-Type: application/json" \
+                  -d '${statusPayload}' \
+                  https://api.github.com/repos/${GITHUB_REPO}/statuses/${COMMIT_SHA}
+                """
+            }
         }
     }
 }
