@@ -62,38 +62,21 @@ pipeline {
     }
 
     post {
-        success {
-            echo "✅ CI passed on merged result"
-            withCredentials([string(credentialsId: 'GITHUB_TOKEN', variable: 'TOKEN')]) {
-                sh '''
-                    curl -s -X POST -H "Authorization: token $TOKEN" \
-                    -H "Content-Type: application/json" \
-                    -d '{
-                        "state": "success",
-                        "context": "continuous-integration/jenkins/pr-merge",
-                        "description": "Build succeeded",
-                        "target_url": "'"$BUILD_URL"'"
-                    }' \
-                    ${GITHUB_API}/repos/${GITHUB_REPO}/statuses/${COMMIT_SHA}
-                '''
-            }
-        }
-
-        failure {
-            echo "❌ CI failed on merged result"
-            withCredentials([string(credentialsId: 'GITHUB_TOKEN', variable: 'TOKEN')]) {
-                sh '''
-                    curl -s -X POST -H "Authorization: token $TOKEN" \
-                    -H "Content-Type: application/json" \
-                    -d '{
-                        "state": "failure",
-                        "context": "continuous-integration/jenkins/pr-merge",
-                        "description": "Build failed",
-                        "target_url": "'"$BUILD_URL"'"
-                    }' \
-                    ${GITHUB_API}/repos/${GITHUB_REPO}/statuses/${COMMIT_SHA}
-                '''
-            }
-        }
-    }
+		success {
+			echo "✅ CI Pipeline passed"
+			sh '''
+				curl -s -X POST -H "Authorization: token ${GITHUB_TOKEN}" \
+					-d '{"state": "success", "context": "continuous-integration/jenkins/pr-merge", "description": "Build succeeded", "target_url": "${BUILD_URL}"}' \
+					https://api.github.com/repos/qillbel/scrap1_q-wmo/statuses/${GIT_COMMIT}
+			'''
+		}
+		failure {
+			echo "❌ CI Pipeline failed"
+			sh '''
+				curl -s -X POST -H "Authorization: token ${GITHUB_TOKEN}" \
+					-d '{"state": "failure", "context": "continuous-integration/jenkins/pr-merge", "description": "Build failed", "target_url": "${BUILD_URL}"}' \
+					https://api.github.com/repos/qillbel/scrap1_q-wmo/statuses/${GIT_COMMIT}
+			'''
+		}
+	}
 }
