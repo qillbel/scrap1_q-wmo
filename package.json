@@ -1,0 +1,12 @@
+{
+  "name": "ci-pipeline-demo",
+  "version": "1.0.0",
+  "description": "Node.js project for Jenkins CI testing",
+  "scripts": {
+    "lint": "echo 'Running linter...' && exit 0",
+    "test:unit": "echo 'Running unit tests...' && exit 0",
+    "test:integration": "echo 'Running integration tests...' && exit 0"
+  },
+  "author": "",
+  "license": "MIT"
+}
