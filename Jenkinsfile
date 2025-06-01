@@ -9,7 +9,8 @@ pipeline {
         stage('Checkout') {
             steps {
                 checkout scm
-                echo "Checked out branch: ${env.BRANCH_NAME}"
+				sh 'ls -lah'
+				sh 'cat package.json || echo "No package.json found"'
             }
         }
 
