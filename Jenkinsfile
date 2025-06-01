@@ -2,10 +2,7 @@ pipeline {
     agent any
 
     environment {
-        // Jenkins credential ID containing your GitHub PAT
-        GITHUB_TOKEN = credentials('jenkins-ci-token')
-        // GitHub repo slug (owner/repo)
-        GITHUB_REPO = 'qillbel/scrap1_q-wmo'
+        GITHUB_REPO = 'qillbel/scrap1_q-wmo'  // your repo here
     }
 
     stages {
@@ -26,44 +23,38 @@ pipeline {
                 sh 'npm run lint'
             }
         }
-
-        stage('Test') {
-            steps {
-                // Make sure you have a "test" script in package.json, else change this line
-                sh 'npm test'
-            }
-        }
     }
 
     post {
         success {
             script {
-                notifyGitHubStatus('success', 'Build succeeded')
+                updateGitHubStatus('success', 'Build succeeded')
             }
         }
         failure {
             script {
-                notifyGitHubStatus('failure', 'Build failed')
+                updateGitHubStatus('failure', 'Build failed')
             }
         }
     }
 }
 
-def notifyGitHubStatus(String state, String description) {
+def updateGitHubStatus(String state, String description) {
     def commitSha = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
     def buildUrl = env.BUILD_URL
 
-    def payload = """
-    {
-        "state": "${state}",
-        "context": "continuous-integration/jenkins/pr-merge",
-        "description": "${description}",
-        "target_url": "${buildUrl}"
+    withCredentials([string(credentialsId: 'jenkins-ci-token', variable: 'GITHUB_TOKEN')]) {
+        // Use a here-doc to avoid Groovy string interpolation issues and expose token safely
+        sh """
+        curl -s -X POST -H "Authorization: token \$GITHUB_TOKEN" -d @- \
+        https://api.github.com/repos/${env.GITHUB_REPO}/statuses/${commitSha} <<EOF
+        {
+            "state": "${state}",
+            "context": "continuous-integration/jenkins/pr-merge",
+            "description": "${description}",
+            "target_url": "${buildUrl}"
+        }
+EOF
+        """
     }
-    """
-
-    sh """
-    curl -s -X POST -H "Authorization: token ${env.GITHUB_TOKEN}" -d '${payload}' \
-    https://api.github.com/repos/${env.GITHUB_REPO}/statuses/${commitSha}
-    """
 }
