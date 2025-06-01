@@ -15,7 +15,8 @@ pipeline {
                     echo "PR ID: ${env.CHANGE_ID}"
 					echo "Target Branch: ${env.CHANGE_TARGET}"
 					sh """
-						git fetch origin
+						git remote set-branches --add origin main
+						git fetch origin main
 						git fetch origin pull/${env.CHANGE_ID}/head:pr-${env.CHANGE_ID}
 						git checkout -b merge-${env.CHANGE_ID} origin/main
 						git merge pr-${env.CHANGE_ID}
