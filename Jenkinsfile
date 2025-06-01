@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        GITHUB_TOKEN = credentials('github-token') // Make sure this credential exists in Jenkins
+        GITHUB_TOKEN = credentials('github-token') // Make sure this exists
         GITHUB_REPO = 'qillbel/scrap1_q-wmo'
     }
 
@@ -32,8 +32,8 @@ pipeline {
 
     post {
         success {
-            node {
-                script {
+            script {
+                node('') {  // Specify your agent label or keep empty if agent any works
                     def statusJson = """
                     {
                         "state": "success",
@@ -51,8 +51,8 @@ pipeline {
             }
         }
         failure {
-            node {
-                script {
+            script {
+                node('') {  // Specify your agent label or keep empty if agent any works
                     def statusJson = """
                     {
                         "state": "failure",
