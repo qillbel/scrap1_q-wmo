@@ -12,15 +12,16 @@ pipeline {
             }
             steps {
                 script {
-                    echo "Checking out and merging PR #${env.CHANGE_ID} into target branch ${env.CHANGE_TARGET}"
-                    sh '''
-                        git fetch origin ${CHANGE_TARGET}
-                        git fetch origin pull/${CHANGE_ID}/head:pr-${CHANGE_ID}
-                        git checkout -b merge-${CHANGE_ID} origin/${CHANGE_TARGET}
-                        git merge pr-${CHANGE_ID}
-                        ls -lah
-                        cat package.json || echo "No package.json found"
-                    '''
+                    echo "PR ID: ${env.CHANGE_ID}"
+					echo "Target Branch: ${env.CHANGE_TARGET}"
+					sh """
+						git fetch origin
+						git fetch origin pull/${env.CHANGE_ID}/head:pr-${env.CHANGE_ID}
+						git checkout -b merge-${env.CHANGE_ID} origin/main
+						git merge pr-${env.CHANGE_ID}
+						ls -lah
+						cat package.json || echo "No package.json found"
+					"""
                 }
             }
         }
