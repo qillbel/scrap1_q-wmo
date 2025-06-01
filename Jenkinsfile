@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        GITHUB_REPO = 'qillbel/scrap1_q-wmo'  // your repo here
+        GITHUB_REPO = 'qillbel/scrap1_q-wmo'
     }
 
     stages {
@@ -43,17 +43,15 @@ def updateGitHubStatus(String state, String description) {
     def commitSha = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
     def buildUrl = env.BUILD_URL
 
-    withCredentials([string(credentialsId: 'jenkins-ci-token', variable: 'GITHUB_TOKEN')]) {
-        // Use a here-doc to avoid Groovy string interpolation issues and expose token safely
+    withCredentials([usernamePassword(credentialsId: 'jenkins-ci-token', usernameVariable: 'GITHUB_USER', passwordVariable: 'GITHUB_TOKEN')]) {
         sh """
-        curl -s -X POST -H "Authorization: token \$GITHUB_TOKEN" -d @- \
-        https://api.github.com/repos/${env.GITHUB_REPO}/statuses/${commitSha} <<EOF
-        {
-            "state": "${state}",
-            "context": "continuous-integration/jenkins/pr-merge",
-            "description": "${description}",
-            "target_url": "${buildUrl}"
-        }
+            curl -s -u "\$GITHUB_USER:\$GITHUB_TOKEN" -X POST -d @- https://api.github.com/repos/${env.GITHUB_REPO}/statuses/${commitSha} <<EOF
+            {
+                "state": "${state}",
+                "context": "continuous-integration/jenkins/pr-merge",
+                "description": "${description}",
+                "target_url": "${buildUrl}"
+            }
 EOF
         """
     }
