@@ -4,24 +4,35 @@ pipeline {
     environment {
         GITHUB_TOKEN = credentials('github-token')
         GITHUB_REPO = 'qillbel/scrap1_q-wmo'
-        PR_ID = '11'  // or inject dynamically
+        PR_ID = '' // will be passed as parameter or parsed from webhook payload
         BASE_BRANCH = 'main'
+        BRANCH_NAME = '' // PR branch name, must be passed in or detected
+    }
+
+    parameters {
+        string(name: 'PR_ID', defaultValue: '', description: 'GitHub PR Number')
+        string(name: 'BRANCH_NAME', defaultValue: '', description: 'PR branch name (e.g., qillbel-patch-1)')
     }
 
     stages {
-        stage('Prepare merged commit') {
+        stage('Checkout & Merge') {
             steps {
-                sh '''
-                  git config --global user.email "jenkins@dummy.com"
-                  git config --global user.name "jenkins bot"
-                  git remote set-url origin https://github.com/${GITHUB_REPO}.git
+                script {
+                    sh """
+                    git config --global user.email "jenkins@dummy.com"
+                    git config --global user.name "jenkins bot"
+                    git remote set-url origin https://github.com/${GITHUB_REPO}.git
 
-                  git fetch origin pull/${PR_ID}/merge:pr-${PR_ID}-merge
-                  git checkout pr-${PR_ID}-merge
+                    git fetch origin ${BASE_BRANCH}
+                    git fetch origin ${BRANCH_NAME}
 
-                  COMMIT_SHA=$(git rev-parse HEAD)
-                  echo "COMMIT_SHA=${COMMIT_SHA}" > env.properties
-                '''
+                    git checkout -b merged-branch origin/${BASE_BRANCH}
+                    git merge origin/${BRANCH_NAME} --no-edit
+
+                    COMMIT_SHA=\$(git rev-parse HEAD)
+                    echo "COMMIT_SHA=\$COMMIT_SHA" > env.properties
+                    """
+                }
             }
         }
 
@@ -48,8 +59,8 @@ pipeline {
         success {
             script {
                 sh """
-                curl -s -X POST -H "Authorization: token ${GITHUB_TOKEN}" -H "Content-Type: application/json" \
-                    -d '{"state":"success","context":"continuous-integration/jenkins/pr-merge","description":"Merged build passed","target_url":"${env.BUILD_URL}"}' \
+                curl -s -X POST -H "Authorization: token ${GITHUB_TOKEN}" -H "Content-Type: application/json" \\
+                    -d '{"state":"success","context":"continuous-integration/jenkins/pr-merge","description":"Merged build passed","target_url":"${env.BUILD_URL}"}' \\
                     https://api.github.com/repos/${GITHUB_REPO}/statuses/${COMMIT_SHA}
                 """
             }
@@ -57,8 +68,8 @@ pipeline {
         failure {
             script {
                 sh """
-                curl -s -X POST -H "Authorization: token ${GITHUB_TOKEN}" -H "Content-Type: application/json" \
-                    -d '{"state":"failure","context":"continuous-integration/jenkins/pr-merge","description":"Merged build failed","target_url":"${env.BUILD_URL}"}' \
+                curl -s -X POST -H "Authorization: token ${GITHUB_TOKEN}" -H "Content-Type: application/json" \\
+                    -d '{"state":"failure","context":"continuous-integration/jenkins/pr-merge","description":"Merged build failed","target_url":"${env.BUILD_URL}"}' \\
                     https://api.github.com/repos/${GITHUB_REPO}/statuses/${COMMIT_SHA}
                 """
             }
