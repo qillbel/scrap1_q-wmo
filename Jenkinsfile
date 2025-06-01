@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        GITHUB_TOKEN = credentials('github-token') // Make sure this exists
+        GITHUB_TOKEN = credentials('jenkins-ci-token')
         GITHUB_REPO = 'qillbel/scrap1_q-wmo'
     }
 
@@ -11,20 +11,16 @@ pipeline {
             steps {
                 checkout scm
                 script {
-                    env.COMMIT_SHA = sh(script: "git rev-parse HEAD", returnStdout: true).trim()
+                    env.COMMIT_SHA = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+                    echo "Commit SHA: ${env.COMMIT_SHA}"
                 }
             }
         }
 
-        stage('Lint') {
+        stage('Lint and Test') {
             steps {
                 sh 'npm install'
                 sh 'npm run lint'
-            }
-        }
-
-        stage('Test') {
-            steps {
                 sh 'npm test'
             }
         }
@@ -33,13 +29,13 @@ pipeline {
     post {
         success {
             script {
-                node('') {  // Specify your agent label or keep empty if agent any works
+                if (env.GITHUB_TOKEN && env.GITHUB_REPO && env.COMMIT_SHA) {
                     def statusJson = """
                     {
-                        "state": "success",
-                        "context": "continuous-integration/jenkins/pr-merge",
-                        "description": "Build succeeded",
-                        "target_url": "${env.BUILD_URL}"
+                      "state": "success",
+                      "context": "continuous-integration/jenkins/pr-merge",
+                      "description": "Build succeeded",
+                      "target_url": "${env.BUILD_URL}"
                     }
                     """
                     sh """
@@ -47,18 +43,20 @@ pipeline {
                          -d '${statusJson}' \\
                          https://api.github.com/repos/${env.GITHUB_REPO}/statuses/${env.COMMIT_SHA}
                     """
+                } else {
+                    echo "Missing GITHUB_TOKEN, GITHUB_REPO or COMMIT_SHA, skipping status update"
                 }
             }
         }
         failure {
             script {
-                node('') {  // Specify your agent label or keep empty if agent any works
+                if (env.GITHUB_TOKEN && env.GITHUB_REPO && env.COMMIT_SHA) {
                     def statusJson = """
                     {
-                        "state": "failure",
-                        "context": "continuous-integration/jenkins/pr-merge",
-                        "description": "Merged build failed",
-                        "target_url": "${env.BUILD_URL}"
+                      "state": "failure",
+                      "context": "continuous-integration/jenkins/pr-merge",
+                      "description": "Build failed",
+                      "target_url": "${env.BUILD_URL}"
                     }
                     """
                     sh """
@@ -66,6 +64,8 @@ pipeline {
                          -d '${statusJson}' \\
                          https://api.github.com/repos/${env.GITHUB_REPO}/statuses/${env.COMMIT_SHA}
                     """
+                } else {
+                    echo "Missing GITHUB_TOKEN, GITHUB_REPO or COMMIT_SHA, skipping status update"
                 }
             }
         }
