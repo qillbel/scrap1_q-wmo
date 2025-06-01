@@ -2,81 +2,91 @@ pipeline {
     agent any
 
     environment {
-        BASE_BRANCH = "main"
-        GITHUB_REPO = "qillbel/scrap1_q-wmo"
-        GITHUB_API = "https://api.github.com"
-        COMMIT_SHA = "" // will be set dynamically
+        GITHUB_TOKEN = credentials('github-token')
+        GITHUB_REPO = 'qillbel/scrap1_q-wmo'
+        PR_ID = '11' // <-- set this dynamically or manually for now
+        BASE_BRANCH = 'main'
     }
 
     stages {
-        stage('Prepare Merge') {
+        stage('Prepare Merged Commit') {
             steps {
-                echo "Fetching PR branch and base branch to test merge"
                 sh '''
                     git config --global user.email "jenkins@dummy.com"
                     git config --global user.name "jenkins bot"
-
                     git remote set-url origin https://github.com/${GITHUB_REPO}.git
-                    git fetch origin
 
+                    # Fetch base branch
                     git fetch origin ${BASE_BRANCH}
-                    git fetch origin ${BRANCH_NAME}
 
-                    git checkout -b test-merge origin/${BASE_BRANCH}
-                    git merge origin/${BRANCH_NAME} --no-edit
+                    # Fetch merged PR commit from GitHub's special ref
+                    git fetch origin pull/${PR_ID}/merge:pr-${PR_ID}-merge
 
-                    export COMMIT_SHA=$(git rev-parse HEAD)
-                    echo "COMMIT_SHA=${COMMIT_SHA}" >> env.properties
+                    # Checkout the merged commit
+                    git checkout pr-${PR_ID}-merge
+
+                    # Save commit SHA for GitHub status API
+                    COMMIT_SHA=$(git rev-parse HEAD)
+                    echo "COMMIT_SHA=${COMMIT_SHA}" > env.properties
                 '''
+            }
+        }
+
+        stage('Load Commit SHA') {
+            steps {
                 script {
                     def props = readProperties file: 'env.properties'
-                    env.COMMIT_SHA = props.COMMIT_SHA
+                    env.COMMIT_SHA = props['COMMIT_SHA']
                 }
             }
         }
 
         stage('Build') {
             steps {
-                echo "Building..."
+                echo "Running build on merged commit: ${env.COMMIT_SHA}"
                 sh 'npm install'
             }
         }
 
         stage('Lint') {
             steps {
+                echo 'Running linter...'
                 sh 'npm run lint || true'
             }
         }
 
         stage('Unit Tests') {
             steps {
+                echo 'Running unit tests...'
                 sh 'npm run test:unit'
             }
         }
 
         stage('Integration Tests') {
             steps {
+                echo 'Running integration tests...'
                 sh 'npm run test:integration'
             }
         }
     }
 
     post {
-		success {
-			echo "✅ CI Pipeline passed"
-			sh '''
-				curl -s -X POST -H "Authorization: token ${GITHUB_TOKEN}" \
-					-d '{"state": "success", "context": "continuous-integration/jenkins/pr-merge", "description": "Build succeeded", "target_url": "${BUILD_URL}"}' \
-					https://api.github.com/repos/qillbel/scrap1_q-wmo/statuses/${GIT_COMMIT}
-			'''
-		}
-		failure {
-			echo "❌ CI Pipeline failed"
-			sh '''
-				curl -s -X POST -H "Authorization: token ${GITHUB_TOKEN}" \
-					-d '{"state": "failure", "context": "continuous-integration/jenkins/pr-merge", "description": "Build failed", "target_url": "${BUILD_URL}"}' \
-					https://api.github.com/repos/qillbel/scrap1_q-wmo/statuses/${GIT_COMMIT}
-			'''
-		}
-	}
+        success {
+            echo "✅ CI Pipeline passed"
+            sh '''
+                curl -s -X POST -H "Authorization: token ${GITHUB_TOKEN}" \
+                -d '{"state": "success", "context": "continuous-integration/jenkins/pr-merge", "description": "Merged build passed", "target_url": "'"${BUILD_URL}"'"}' \
+                https://api.github.com/repos/${GITHUB_REPO}/statuses/${COMMIT_SHA}
+            '''
+        }
+
+        failure {
+            echo "❌ CI Pipeline failed"
+            sh '''
+                curl -s -X POST -H "Authorization: token ${GITHUB_TOKEN}" \
+                -d '{"state": "failure", "context": "continuous-integration/jenkins/pr-merge", "description": "Merged build failed", "target_url": "'"${BUILD_URL}"'"}' \
+                https://api.github.com/repos/${GITHUB_REPO}/statuses/${COMMIT_SHA}
+            '''
+        }
+    }
 }
