@@ -18,5 +18,9 @@ def scrape_weather():
     resu = json.dumps(parsed)
     return resu
 
+@app.route('/hometest')
+def home():
+    return "Home page test"
+
 if __name__ == "__main__":
     app.run()
