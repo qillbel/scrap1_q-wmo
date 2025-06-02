@@ -132,4 +132,3 @@ def scrapeWeather(jsonify=False):
         return
 
 scrapeWeather()
-#check jenkins from qill-reviewer 11xa 
